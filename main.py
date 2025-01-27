@@ -1,6 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from g4f.client import Client
+import asyncio
+import nest_asyncio
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
 
 app = FastAPI()
 
@@ -14,9 +19,14 @@ class PromptRequest(BaseModel):
 async def generate_response(request: PromptRequest):
     client = Client()
     try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": request.prompt}],
+        # Create the completion in a way that works with asyncio
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": request.prompt}],
+            )
         )
         return {"response": response.choices[0].message.content}
     except Exception as e:
